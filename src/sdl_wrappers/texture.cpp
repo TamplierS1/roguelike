@@ -22,6 +22,12 @@ Texture::Texture(const std::string& path, Renderer* renderer)
     // Initialise m_width, m_height.
     SDL_QueryTexture(m_texture, nullptr, nullptr, &m_width, &m_height);
 
+    if (m_width != 32 || m_height != 32)
+    {
+        Log::error("Wrong texture size: " + std::to_string(m_width) + " x " + " " +
+                   std::to_string(m_height) + ".\n");
+    }
+
     SDL_FreeSurface(loaded_surface);
 }
 Texture::~Texture()

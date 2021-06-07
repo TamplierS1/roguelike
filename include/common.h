@@ -13,8 +13,13 @@ using u_ptr = std::unique_ptr<T>;
 template <class T>
 using s_ptr = std::shared_ptr<T>;
 
+template <class T>
+using w_ptr = std::weak_ptr<T>;
+
 static constexpr int g_screen_width = 1920;
 static constexpr int g_screen_height = 1080;
+
+static constexpr int g_tile_width = 32;
 
 }
 
