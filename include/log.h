@@ -6,6 +6,7 @@
 namespace Rg::Log
 {
 void error(std::string_view msg);
+void warning(std::string_view msg);
 
 }
 

@@ -3,6 +3,8 @@
 
 #include "SDL2/SDL.h"
 
+#include "object.h"
+
 namespace Rg
 {
 class Window;
@@ -22,7 +24,9 @@ public:
     Renderer(Window* window, uint32_t flags, Color color = {0, 0, 0, 255});
     ~Renderer();
 
-    void render(Texture* texture, int x, int y);
+    void render_begin();
+    void render(Object* object, Texture* texture);
+    void render_end();
     // Access the original SDL struct
     [[nodiscard]] constexpr SDL_Renderer* get() const noexcept
     {
