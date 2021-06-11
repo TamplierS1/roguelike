@@ -17,11 +17,8 @@ int Game::run()
     while (m_is_running)
     {
         process_events();
-        // InputController should always be updated after
-        // all events are processed.
-        InputController::get().update();
 
-        update_objects();
+        update();
     }
 
     return EXIT_SUCCESS;
@@ -46,19 +43,23 @@ void Game::init()
                                         SDL_WINDOW_RESIZABLE);
     m_renderer = std::make_shared<Renderer>(m_window.get(), SDL_RENDERER_ACCELERATED);
 
+    load_textures();
+
+    auto player =
+        std::make_shared<Object>(Vec2{10 * g_tile_size, 10 * g_tile_size},
+                                 TextureManager::get().get_texture("krest"), m_renderer);
+    m_player = player;
+
+    m_map = std::make_unique<Map>(m_renderer);
+}
+
+void Game::load_textures()
+{
     TextureManager::get().load_texture("../res/texture.png", "krest", m_renderer.get());
-
-    auto object = std::make_shared<Object>(Vec2{64, 64});
-    auto render = std::make_shared<Components::Render>(
-        TextureManager::get().get_texture("krest"), m_renderer);
-    auto control = std::make_shared<Components::Control>();
-    auto physics = std::make_shared<Components::Physics>(1);
-
-    object->add_component("render", render);
-    object->add_component("control", control);
-    object->add_component("physics", physics);
-
-    m_objects.emplace_back(object);
+    TextureManager::get().load_texture("../res/rock_wall.png", "rock_wall",
+                                       m_renderer.get());
+    TextureManager::get().load_texture("../res/rock_floor.png", "rock_floor",
+                                       m_renderer.get());
 }
 
 void Game::process_events()
@@ -70,18 +71,55 @@ void Game::process_events()
         {
             case SDL_QUIT:
                 m_is_running = false;
+                break;
+            case SDL_KEYDOWN:
+                handle_input(event);
+                break;
         }
     }
 }
 
-void Game::update_objects()
+void Game::update()
 {
     m_renderer->render_begin();
-    for (auto& object : m_objects)
+
+    m_map->render(m_camera);
+
+    m_player->render(m_camera);
+
+    m_player->regen_energy();
+    auto action = m_player->get_action();
+    if (action != nullptr)
     {
-        object->update();
+        if (!action->execute(m_player.get()))
+        {
+            Log::warning("Not enough energy to perform an action.\n");
+        }
     }
+
+    m_camera.m_x = (m_player->m_pos.x + g_tile_size / 2) - g_screen_width / 2;
+    m_camera.m_y = (m_player->m_pos.y + g_tile_size / 2) - g_screen_height / 2;
+
     m_renderer->render_end();
+}
+
+void Game::handle_input(SDL_Event event)
+{
+    switch (event.key.keysym.sym)
+    {
+        case SDLK_d:
+            move_player(Vec2{1, 0});
+            break;
+        case SDLK_a:
+            move_player(Vec2{-1, 0});
+            break;
+        case SDLK_w:
+            move_player(Vec2{0, -1});
+            break;
+        case SDLK_s:
+            move_player(Vec2{0, 1});
+            break;
+    }
 }
 
 }

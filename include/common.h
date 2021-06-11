@@ -19,7 +19,7 @@ using w_ptr = std::weak_ptr<T>;
 static constexpr int g_screen_width = 1920;
 static constexpr int g_screen_height = 1080;
 
-static constexpr int g_tile_width = 32;
+static constexpr int g_tile_size = 32;
 
 }
 

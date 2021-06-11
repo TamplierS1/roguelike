@@ -20,7 +20,7 @@ public:
 
     void load_texture(const std::string& path, const std::string& name,
                       Renderer* renderer);
-    [[nodiscard]] s_ptr<Texture>& get_texture(const std::string& name)
+    [[nodiscard]] s_ptr<Texture> get_texture(const std::string& name)
     {
         assert(m_textures.find(name) != m_textures.end());
         return m_textures[name];
