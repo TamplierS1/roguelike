@@ -26,10 +26,12 @@ void Renderer::render_begin()
     SDL_RenderClear(m_renderer);
 }
 
-void Renderer::render(Object* object, Texture* texture)
+void Renderer::render(Object* object, Texture* texture, Camera camera)
 {
-    auto rect = SDL_Rect{
-        .x = object->m_pos.x, .y = object->m_pos.y, .w = g_tile_width, .h = g_tile_width};
+    auto rect = SDL_Rect{.x = (object->m_pos.x - camera.m_x) / 2,
+                         .y = (object->m_pos.y - camera.m_y) / 2,
+                         .w = g_tile_size / 2,
+                         .h = g_tile_size / 2};
     SDL_RenderCopy(m_renderer, texture->get(), nullptr, &rect);
 }
 

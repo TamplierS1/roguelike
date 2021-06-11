@@ -8,13 +8,13 @@
 #include "sdl_wrappers/window.h"
 #include "sdl_wrappers/renderer.h"
 #include "sdl_wrappers/texture.h"
-#include "components/render.h"
-#include "components/control.h"
-#include "components/physics.h"
 #include "texture_manager.h"
+#include "actions/move.h"
+#include "map.h"
 
 namespace Rg
 {
+
 class Game
 {
 public:
@@ -28,14 +28,23 @@ public:
 
 private:
     void init();
+    void load_textures();
     void process_events();
-    void update_objects();
+    void update();
+    void handle_input(SDL_Event event);
+
+    void move_player(Vec2 dir)
+    {
+        m_player->set_action(std::make_shared<Actions::Move>(dir));
+    }
 
     u_ptr<Window> m_window;
     s_ptr<Renderer> m_renderer;
+    s_ptr<Object> m_player;
 
-    std::vector<s_ptr<Object>> m_objects;
+    u_ptr<Map> m_map;
 
+    Camera m_camera = {0, 0};
     bool m_is_running = true;
 };
 

@@ -18,6 +18,12 @@ struct Color
     uint8_t a;
 };
 
+struct Camera
+{
+    int m_x;
+    int m_y;
+};
+
 class Renderer
 {
 public:
@@ -25,7 +31,7 @@ public:
     ~Renderer();
 
     void render_begin();
-    void render(Object* object, Texture* texture);
+    void render(Object* object, Texture* texture, Camera camera);
     void render_end();
     // Access the original SDL struct
     [[nodiscard]] constexpr SDL_Renderer* get() const noexcept
