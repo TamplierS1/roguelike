@@ -42,7 +42,7 @@ private:
     s_ptr<Renderer> m_renderer;
     s_ptr<Object> m_player;
 
-    u_ptr<Map> m_map;
+    u_ptr<Map::Map> m_map;
 
     Camera m_camera = {0, 0};
     bool m_is_running = true;

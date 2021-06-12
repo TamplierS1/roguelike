@@ -7,6 +7,7 @@
 #include "SDL2/SDL_image.h"
 
 #include "log.h"
+#include "color.h"
 
 namespace Rg
 {
@@ -15,7 +16,8 @@ class Renderer;
 class Texture
 {
 public:
-    Texture(const std::string& path, Renderer* renderer);
+    Texture(const std::string& path, Renderer* renderer,
+            Color color = {255, 255, 255, 255});
     ~Texture();
 
     // Access the original SDL struct
