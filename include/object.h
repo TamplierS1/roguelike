@@ -22,7 +22,7 @@ public:
     {
     }
 
-    void render(const Camera& camera);
+    void render(const Camera& camera, Color color = {255, 255, 255, 255});
     [[nodiscard]] Actions::IAction* get_action()
     {
         auto action = m_current_action;

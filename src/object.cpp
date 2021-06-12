@@ -3,9 +3,9 @@
 
 namespace Rg
 {
-void Object::render(const Camera& camera)
+void Object::render(const Camera& camera, Color color)
 {
-    m_renderer.lock()->render(this, m_texture.lock().get(), camera);
+    m_renderer.lock()->render(this, m_texture.lock().get(), camera, color);
 }
 
 }

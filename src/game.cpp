@@ -50,7 +50,7 @@ void Game::init()
                                  TextureManager::get().get_texture("krest"), m_renderer);
     m_player = player;
 
-    m_map = std::make_unique<Map>(m_renderer);
+    m_map = std::make_unique<Map::Map>(m_renderer);
 }
 
 void Game::load_textures()

@@ -3,7 +3,7 @@
 
 namespace Rg
 {
-Texture::Texture(const std::string& path, Renderer* renderer)
+Texture::Texture(const std::string& path, Renderer* renderer, Color color)
 {
     SDL_Surface* loaded_surface = IMG_Load(path.c_str());
     if (loaded_surface == nullptr)
@@ -18,6 +18,9 @@ Texture::Texture(const std::string& path, Renderer* renderer)
         Log::error("Failed to create texture " + path + ":\n\t" + SDL_GetError());
         throw std::bad_alloc{};
     }
+
+    SDL_SetTextureColorMod(m_texture, color.r, color.g, color.b);
+    SDL_SetTextureAlphaMod(m_texture, color.a);
 
     // Initialise m_width, m_height.
     SDL_QueryTexture(m_texture, nullptr, nullptr, &m_width, &m_height);

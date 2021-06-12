@@ -1,16 +1,16 @@
 #include "map.h"
 #include "texture_manager.h"
 
-namespace Rg
+namespace Rg::Map
 {
 Map::Map(const s_ptr<Renderer>& renderer)
     : m_renderer(renderer)
     , m_rock_floor_texture(TextureManager::get().get_texture("rock_floor"))
-    , m_engine(m_rd())
 {
     fill_map_with_walls();
     dig_rooms();
     dig_mazes();
+    connect_regions();
 }
 
 void Map::render(const Camera& camera)
@@ -20,7 +20,7 @@ void Map::render(const Camera& camera)
         for (int y = 0; y < m_height; ++y)
         {
             auto object = m_map[x][y].m_object;
-            object->render(camera);
+            object->render(camera, m_map[x][y].m_color);
 
             if (!m_map[x][y].is_dynamic)
                 continue;
@@ -49,7 +49,8 @@ void Map::fill_map_with_walls()
         {
             auto rock_wall = std::make_shared<Object>(
                 Vec2{x * g_tile_size, y * g_tile_size}, rock_wall_texture, m_renderer);
-            m_map[x][y] = Cell{CellType::Wall, Vec2{x, y}, false, rock_wall};
+            m_map[x][y] = Cell{CellType::Wall, Vec2{x, y}, false, rock_wall,
+                               Color{255, 255, 255, 255}};
         }
     }
 }
@@ -57,21 +58,21 @@ void Map::fill_map_with_walls()
 void Map::dig_rooms()
 {
     // Generate rooms at random areas in the map.
-    for (int i = 0; i < m_attempts_to_gen_rooms; ++i)
+    for (int i = 0; i < m_room_density; ++i)
     {
-        RandomInt what_x{1, m_width};
-        RandomInt what_y{1, m_height};
-        Vec2 pos{what_x(m_engine), what_y(m_engine)};
+        Vec2 pos{m_rng.rand_int(1, m_width), m_rng.rand_int(1, m_height)};
 
-        RandomInt what_size{m_room_size_min, m_room_size_max};
-        Vec2 size{what_size(m_engine), what_size(m_engine)};
+        Vec2 size{m_rng.rand_int(m_room_size_min, m_room_size_max),
+                  m_rng.rand_int(m_room_size_min, m_room_size_max)};
 
         if (!is_area_available(pos, pos + size + 1))
         {
             continue;
         }
 
-        dig(pos + 1, pos + size);
+        dig(pos + 1, pos + size,
+            Color{m_rng.rand_int(0, 255), m_rng.rand_int(0, 255), m_rng.rand_int(0, 255),
+                  m_rng.rand_int(0, 255)});
 
         m_rooms.push_back(Room{pos, pos + size + 1});
     }
@@ -79,26 +80,23 @@ void Map::dig_rooms()
 
 void Map::dig_mazes()
 {
-    // Запоминай в какую сторону двигается генератор
-    // и чекай чтобы клетки с необходимых сторон были свободны.
-    // Чека на количество клеток недостаточно. Еще можно сделать так,
-    // чтобы алгоритм предпочитал двигаться в одном направлении,
-    // вместо того, чтобы создавать много маленьких туннелей.
-    for (int x = 2; x < m_width - 2; ++x)
+    for (int x = 3; x < m_width - 3; x += 2)
     {
-        for (int y = 2; y < m_height - 2; ++y)
+        for (int y = 3; y < m_height - 3; y += 2)
         {
+            auto corridor_color = Color{m_rng.rand_int(0, 255), m_rng.rand_int(0, 255),
+                                        m_rng.rand_int(0, 255), m_rng.rand_int(0, 255)};
             if (num_of_solid_neighbours(&m_map[x][y]) == 8 &&
                 m_map[x][y].m_type == CellType::Wall)
             {
                 // Starting cell.
                 m_live_cells.push_back(std::make_shared<Cell>(m_map[x][y]));
-                dig(Vec2{x, y});
+                dig(Vec2{x, y}, corridor_color);
 
                 // The actual algorithm (growing tree algorithm).
                 while (!m_live_cells.empty())
                 {
-                    // Pick the newest cell.
+                    // Pick the oldest cell.
                     s_ptr<Cell> cell = m_live_cells.back();
 
                     if (cell->m_pos.x >= m_width - 2 || cell->m_pos.y >= m_height - 2 ||
@@ -119,8 +117,7 @@ void Map::dig_mazes()
                     bool success = false;
                     while (!neighbours.empty())
                     {
-                        RandomInt what_neighbour{0, 3};
-                        int index = what_neighbour(m_engine);
+                        int index = m_rng.rand_prob_int(m_neighbour_probs);
 
                         try
                         {
@@ -132,6 +129,7 @@ void Map::dig_mazes()
                         }
 
                         if (neighbours[index]->m_type == CellType::Floor ||
+                            !are_cells_around_free(neighbours[index]) ||
                             num_of_solid_neighbours(neighbours[index]) < 6)
                         {
                             neighbours.erase(std::find(
@@ -139,9 +137,12 @@ void Map::dig_mazes()
                             continue;
                         }
 
+                        m_neighbour_probs = {25, 25, 25, 25};
+                        m_neighbour_probs[index] = m_corridor_windiness;
+
                         m_live_cells.push_back(
                             std::make_shared<Cell>(*neighbours[index]));
-                        dig(neighbours[index]->m_pos);
+                        dig(neighbours[index]->m_pos, corridor_color);
                         success = true;
                         break;
                     }
@@ -156,7 +157,12 @@ void Map::dig_mazes()
     }
 }
 
-void Map::dig(Vec2 begin, Vec2 end)
+void Map::connect_regions()
+{
+    // Pick a random room to be the main region.
+}
+
+void Map::dig(Vec2 begin, Vec2 end, Color color)
 {
     for (int x = begin.x; x < end.x; ++x)
     {
@@ -164,16 +170,16 @@ void Map::dig(Vec2 begin, Vec2 end)
         {
             auto object = std::make_shared<Object>(Vec2{x * g_tile_size, y * g_tile_size},
                                                    m_rock_floor_texture, m_renderer);
-            m_map[x][y] = Cell{CellType::Floor, Vec2{x, y}, false, object};
+            m_map[x][y] = Cell{CellType::Floor, Vec2{x, y}, false, object, color};
         }
     }
 }
 
-void Map::dig(Vec2 pos)
+void Map::dig(Vec2 pos, Color color)
 {
     auto object = std::make_shared<Object>(Vec2{pos.x * g_tile_size, pos.y * g_tile_size},
                                            m_rock_floor_texture, m_renderer);
-    m_map[pos.x][pos.y] = Cell{CellType::Floor, Vec2{pos.x, pos.y}, false, object};
+    m_map[pos.x][pos.y] = Cell{CellType::Floor, Vec2{pos.x, pos.y}, false, object, color};
 }
 
 bool Map::is_area_available(Vec2 begin, Vec2 end)
@@ -205,16 +211,36 @@ constexpr int Map::num_of_solid_neighbours(const Cell* cell) const
             num += m_map[x][y].m_type == CellType::Wall;
         }
     }
-    //        Vec2 pos = cell->m_pos;
-    //
-    //    num += m_map[pos.x][pos.y - 1].m_type == CellType::Wall;  // Upper cell.
-    //    num += m_map[pos.x + 1][pos.y].m_type == CellType::Wall;  // Right cell.
-    //    num += m_map[pos.x][pos.y + 1].m_type == CellType::Wall;  // Bottom cell.
-    //    num += m_map[pos.x - 1][pos.y].m_type == CellType::Wall;  // Left cell.
-    //
-    //    return num;
     // Subtract the cell itself.
     return num - 1;
+}
+
+bool Map::are_cells_around_free(const Cell* cell) const
+{
+    for (int x = cell->m_pos.x - 1; x <= cell->m_pos.x + 1; ++x)
+    {
+        for (int y = cell->m_pos.y - 1; y <= cell->m_pos.y + 1; ++y)
+        {
+            if (m_map[x][y].m_type == CellType::Floor &&
+                !is_cell_in_live_cells(m_map[x][y]))
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool Map::is_cell_in_live_cells(const Cell& cell) const
+{
+    for (auto& live_cell : m_live_cells)
+    {
+        if (live_cell->m_pos == cell.m_pos)
+            return true;
+    }
+
+    return false;
 }
 
 }
