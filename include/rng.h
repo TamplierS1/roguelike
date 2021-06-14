@@ -17,6 +17,7 @@ public:
     // Each possible value has a predefined probability.
     [[nodiscard]] int rand_prob_int(const std::vector<int>& probabilities);
     [[nodiscard]] bool rand_bool();
+    [[nodiscard]] bool one_in(int number);
 
 private:
     std::random_device m_rd;

@@ -20,4 +20,12 @@ bool Rng::rand_bool()
     return rand(m_engine);
 }
 
+[[nodiscard]] bool Rng::one_in(int number)
+{
+    std::uniform_int_distribution<> rand{1, number};
+    if (rand(m_engine) == 1)
+        return true;
+    return false;
+}
+
 }
