@@ -33,8 +33,6 @@ public:
         return m_renderer;
     }
 
-    Color m_clear_color;
-
 private:
     SDL_Renderer* m_renderer;
 };
