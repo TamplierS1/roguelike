@@ -15,14 +15,21 @@ struct Camera;
 class Object
 {
 public:
-    Object(Vec2 pos, const s_ptr<Texture>& texture, const s_ptr<Renderer>& renderer)
+    Object(Vec2 pos, const s_ptr<Texture>& texture, const s_ptr<Renderer>& renderer,
+           int energy_regen = 50)
         : m_pos(pos)
         , m_texture(texture)
         , m_renderer(renderer)
+        , m_energy_regen(energy_regen)
     {
     }
+    virtual ~Object() = default;
 
-    void render(const Camera& camera, Color color = {255, 255, 255, 255});
+    virtual void update(const Camera& camera, Color color)
+    {
+        m_energy += m_energy_regen;
+        render(camera, color);
+    }
     [[nodiscard]] Actions::IAction* get_action()
     {
         auto action = m_current_action;
@@ -33,10 +40,6 @@ public:
     {
         m_current_action = action;
     }
-    constexpr void regen_energy()
-    {
-        m_energy += m_energy_regen;
-    }
 
     Vec2 m_pos;
     // Every action consumes energy.
@@ -45,12 +48,14 @@ public:
     int m_energy = 100;
 
 private:
+    void render(const Camera& camera, Color color);
+
     w_ptr<Texture> m_texture;
     w_ptr<Renderer> m_renderer;
 
     s_ptr<Actions::IAction> m_current_action;
 
-    int m_energy_regen = 50;
+    int m_energy_regen;
 };
 }
 

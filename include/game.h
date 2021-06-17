@@ -11,10 +11,10 @@
 #include "texture_manager.h"
 #include "actions/move.h"
 #include "map.h"
+#include "monster.h"
 
 namespace Rg
 {
-
 class Game
 {
 public:
@@ -35,14 +35,14 @@ private:
 
     void move_player(Vec2 dir)
     {
-        m_player->set_action(std::make_shared<Actions::Move>(dir));
+        m_player->set_action(std::make_shared<Actions::Move>(dir, m_map));
     }
 
     u_ptr<Window> m_window;
     s_ptr<Renderer> m_renderer;
-    s_ptr<Object> m_player;
+    s_ptr<Monster> m_player;
 
-    u_ptr<Map::Map> m_map;
+    s_ptr<Map::Map> m_map;
 
     Camera m_camera = {0, 0};
     bool m_is_running = true;
