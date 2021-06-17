@@ -1,35 +1,48 @@
 #ifndef MOVE_H
 #define MOVE_H
 
+#include <typeinfo>
+
 #include "action.h"
+#include "monster.h"
+#include "map.h"
 
 namespace Rg::Actions
 {
 class Move : public IAction
 {
 public:
-    explicit Move(Vec2 dir)
+    explicit Move(Vec2 dir, const s_ptr<Map::Map>& map)
         : m_dir(dir)
+        , m_map(map)
     {
     }
 
-    bool execute(Object* object) override
+    void execute(Object* object) override
     {
+        assert(typeid(*object) == typeid(Monster));
+
         if (object->m_energy < static_cast<int>(Costs::Move))
         {
-            return false;
+            throw ActionFailed{FailReason::NotEnoughEnergy, "Not enough energy to move."};
         }
 
-        object->m_pos.y += g_tile_size * m_dir.y;
-        object->m_pos.x += g_tile_size * m_dir.x;
+        Vec2 new_pos{object->m_pos.x + m_dir.x, object->m_pos.y + m_dir.y};
+
+        if (!m_map.lock()->is_cell_available(new_pos))
+        {
+            throw ActionFailed{FailReason::SpaceIsOccupied,
+                               "Can't move into an occupied space."};
+        }
+
+        object->m_pos = new_pos;
 
         object->m_energy -= static_cast<int>(Costs::Move);
-
-        return true;
     }
 
 private:
     Vec2 m_dir;
+    w_ptr<Map::Map> m_map;
 };
 }
 

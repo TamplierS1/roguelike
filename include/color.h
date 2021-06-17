@@ -13,6 +13,7 @@ struct Color
 
 static constexpr Color g_color_black{0, 0, 0, 255};
 static constexpr Color g_color_white{255, 255, 255, 255};
+static constexpr Color g_color_dark_grey{80, 80, 80, 255};
 
 constexpr static bool operator==(const Color& color1, const Color& color2)
 {

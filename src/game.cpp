@@ -45,17 +45,20 @@ void Game::init()
 
     load_textures();
 
-    auto player =
-        std::make_shared<Object>(Vec2{10 * g_tile_size, 10 * g_tile_size},
-                                 TextureManager::get().get_texture("krest"), m_renderer);
+    m_map = std::make_shared<Map::Map>(m_renderer);
+
+    auto player = std::make_shared<Monster>(
+        m_map->m_player_start_position, TextureManager::get().get_texture("kriegsman"),
+        m_renderer, 100, 50, 6);
     m_player = player;
 
-    m_map = std::make_unique<Map::Map>(m_renderer);
+    m_map->set_player(player);
 }
 
 void Game::load_textures()
 {
-    TextureManager::get().load_texture("../res/texture.png", "krest", m_renderer.get());
+    TextureManager::get().load_texture("../res/kriegsman.png", "kriegsman",
+                                       m_renderer.get());
     TextureManager::get().load_texture("../res/rock_wall.png", "rock_wall",
                                        m_renderer.get());
     TextureManager::get().load_texture("../res/rock_floor.png", "rock_floor",
@@ -83,22 +86,27 @@ void Game::update()
 {
     m_renderer->render_begin();
 
-    m_map->render(m_camera);
+    m_map->update(m_camera);
 
-    m_player->render(m_camera);
+    m_player->update(m_camera, g_color_white);
 
-    m_player->regen_energy();
     auto action = m_player->get_action();
     if (action != nullptr)
     {
-        if (!action->execute(m_player.get()))
+        try
         {
-            Log::warning("Not enough energy to perform an action.\n");
+            action->execute(m_player.get());
+        }
+        catch (const Actions::ActionFailed& e)
+        {
+            Log::warning(e.m_msg);
         }
     }
 
-    m_camera.m_x = (m_player->m_pos.x + g_tile_size / 2) - g_screen_width / 2;
-    m_camera.m_y = (m_player->m_pos.y + g_tile_size / 2) - g_screen_height / 2;
+    m_camera.x = m_player->m_pos.x * g_tile_size + g_tile_size / 2 -
+                 g_screen_width / 2 / m_camera.zoom;
+    m_camera.y = m_player->m_pos.y * g_tile_size + g_tile_size / 2 -
+                 g_screen_height / 2 / m_camera.zoom;
 
     m_renderer->render_end();
 }

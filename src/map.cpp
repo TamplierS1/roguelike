@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cmath>
 
 #include "map.h"
 #include "texture_manager.h"
@@ -14,6 +15,27 @@ Map::Map(const s_ptr<Renderer>& renderer)
     dig_mazes();
     connect_regions();
     remove_dead_ends();
+    remove_pillars();
+
+    Room starting_room = m_rooms[m_rng.rand_int(0, m_rooms.size() - 1)];
+    m_player_start_position =
+        starting_room.begin + (starting_room.end - starting_room.begin) / 2;
+}
+
+void Map::update(const Camera& camera)
+{
+    update_fog_of_war();
+    render(camera);
+}
+
+void Map::set_player(const s_ptr<Monster>& player)
+{
+    m_player = player;
+}
+
+bool Map::is_cell_available(Vec2 pos) const
+{
+    return m_map[pos.x][pos.y].type == CellType::Floor;
 }
 
 void Map::render(const Camera& camera)
@@ -22,22 +44,100 @@ void Map::render(const Camera& camera)
     {
         for (int y = 0; y < m_height; ++y)
         {
-            auto object = m_map[x][y].m_object;
-            object->render(camera, m_map[x][y].m_color);
+            auto object = m_map[x][y].object;
+
+            Color tile_color = g_color_black;
+            if (m_map[x][y].is_explored && !m_map[x][y].is_visible)
+                tile_color = g_color_dark_grey;
+            else if (m_map[x][y].is_visible)
+                tile_color = g_color_white;
+
+            object->update(camera, tile_color);
 
             if (!m_map[x][y].is_dynamic)
                 continue;
 
-            object->regen_energy();
-
             auto action = object->get_action();
             if (action != nullptr)
             {
-                if (!action->execute(object.get()))
+                try
                 {
-                    Log::warning("Not enough energy to perform an action.\n");
+                    action->execute(object.get());
+                }
+                catch (const Actions::ActionFailed& e)
+                {
+                    Log::warning(e.m_msg);
                 }
             }
+        }
+    }
+}
+
+void Map::update_fog_of_war()
+{
+    auto player = m_player.lock();
+
+    Vec2 pos = player->m_pos;
+    int radius = player->m_vision_radius;
+
+    // Make every cell in the visible radius invisible.
+    for (int x = pos.x - radius - 1; x <= pos.x + radius + 1; ++x)
+    {
+        for (int y = pos.y - radius - 1; y <= pos.y + radius + 1; ++y)
+        {
+            m_map[x][y].is_visible = false;
+        }
+    }
+
+    // Cast rays to the upper and bottom part of visible radius.
+    for (int x = pos.x - radius; x <= pos.x + radius; ++x)
+    {
+        cast_ray(pos, Vec2{x, pos.y - radius});
+        cast_ray(pos, Vec2{x, pos.y + radius});
+    }
+
+    // Right and left part.
+    for (int y = pos.y - radius; y <= pos.y + radius; ++y)
+    {
+        cast_ray(pos, Vec2{pos.x + radius, y});
+        cast_ray(pos, Vec2{pos.x - radius, y});
+    }
+}
+
+void Map::cast_ray(Vec2 begin, Vec2 end)
+{
+    int x0 = begin.x, y0 = begin.y;
+    int x1 = end.x, y1 = end.y;
+
+    int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    int dy = -std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    int err = dx + dy, e2;
+
+    bool end_ray = false;
+    for (;;)
+    {
+        if (end_ray)
+            return;
+
+        if (m_map[x0][y0].type == CellType::Wall)
+            end_ray = true;
+
+        m_map[x0][y0].is_visible = true;
+        m_map[x0][y0].is_explored = true;
+
+        if (x0 == x1 && y0 == y1)
+            break;
+
+        e2 = 2 * err;
+        if (e2 >= dy)
+        {
+            err += dy;
+            x0 += sx;
+        }
+        if (e2 <= dx)
+        {
+            err += dx;
+            y0 += sy;
         }
     }
 }
@@ -50,10 +150,10 @@ void Map::fill_map_with_walls()
     {
         for (int y = 0; y < m_height; ++y)
         {
-            auto rock_wall = std::make_shared<Object>(
-                Vec2{x * g_tile_size, y * g_tile_size}, rock_wall_texture, m_renderer);
-            m_map[x][y] = Cell{CellType::Wall, Vec2{x, y}, false, rock_wall,
-                               Color{255, 255, 255, 255}};
+            auto rock_wall =
+                std::make_shared<Object>(Vec2{x, y}, rock_wall_texture, m_renderer);
+            m_map[x][y] =
+                Cell{CellType::Wall, Vec2{x, y}, false, rock_wall, g_color_white};
         }
     }
 }
@@ -93,7 +193,7 @@ void Map::dig_rooms()
         {
             for (int y = pos.y + 1; y < pos.y + size.y; ++y)
             {
-                room.m_cells.push_back(&m_map[x][y]);
+                room.cells.push_back(&m_map[x][y]);
             }
         }
         m_regions.push_back(room);
@@ -111,8 +211,8 @@ void Map::dig_mazes()
             auto corridor_color = Color{m_rng.rand_int(0, 255), m_rng.rand_int(0, 255),
                                         m_rng.rand_int(0, 255), m_rng.rand_int(0, 255)};
 
-            if (num_of_solid_neighbours(m_map[x][y]) == 8 &&
-                m_map[x][y].m_type == CellType::Wall)
+            if (num_of_wall_neighbours(m_map[x][y]) == 8 &&
+                m_map[x][y].type == CellType::Wall)
             {
                 Region region{{}, corridor_color, false};
 
@@ -126,8 +226,8 @@ void Map::dig_mazes()
                     // Pick the oldest cell.
                     s_ptr<Cell> cell = m_live_cells.back();
 
-                    if (cell->m_pos.x >= m_width - 2 || cell->m_pos.y >= m_height - 2 ||
-                        cell->m_pos.x <= 1 || cell->m_pos.y <= 1)
+                    if (cell->pos.x >= m_width - 2 || cell->pos.y >= m_height - 2 ||
+                        cell->pos.x <= 1 || cell->pos.y <= 1)
                     {
                         m_live_cells.pop_back();
                         continue;
@@ -135,7 +235,7 @@ void Map::dig_mazes()
 
                     // Randomly choose a neighbouring wall that can become an open space.
                     std::vector<Cell*> neighbours;
-                    Vec2 pos = cell->m_pos;
+                    Vec2 pos = cell->pos;
                     neighbours.push_back(&m_map[pos.x][pos.y - 1]);  // Upper cell.
                     neighbours.push_back(&m_map[pos.x + 1][pos.y]);  // Right cell.
                     neighbours.push_back(&m_map[pos.x][pos.y + 1]);  // Bottom cell.
@@ -155,9 +255,9 @@ void Map::dig_mazes()
                             continue;
                         }
 
-                        if (neighbours[index]->m_type == CellType::Floor ||
+                        if (neighbours[index]->type == CellType::Floor ||
                             !are_cells_around_free(*neighbours[index]) ||
-                            num_of_solid_neighbours(*neighbours[index]) < 6)
+                            num_of_wall_neighbours(*neighbours[index]) < 6)
                         {
                             neighbours.erase(std::find(
                                 neighbours.begin(), neighbours.end(), neighbours[index]));
@@ -169,8 +269,8 @@ void Map::dig_mazes()
 
                         m_live_cells.push_back(
                             std::make_shared<Cell>(*neighbours[index]));
-                        dig(neighbours[index]->m_pos, corridor_color);
-                        region.m_cells.push_back(neighbours[index]);
+                        dig(neighbours[index]->pos, corridor_color);
+                        region.cells.push_back(neighbours[index]);
                         success = true;
                         break;
                     }
@@ -195,7 +295,7 @@ void Map::connect_regions()
     {
         for (int y = 1; y < m_height - 1; ++y)
         {
-            if (m_map[x][y].m_type == CellType::Wall &&
+            if (m_map[x][y].type == CellType::Wall &&
                 is_adjacent_to_different_regions(m_map[x][y]))
             {
                 connectors.push_back(&m_map[x][y]);
@@ -210,10 +310,10 @@ void Map::connect_regions()
         main_region = m_regions[m_rng.rand_int(0, m_regions.size() - 1)];
     }
     // Color the main region white.
-    main_region.m_color = g_color_white;
-    for (auto cell : main_region.m_cells)
+    main_region.color = g_color_white;
+    for (auto cell : main_region.cells)
     {
-        cell->m_color = g_color_white;
+        cell->color = g_color_white;
     }
 
     while (!connectors.empty())
@@ -233,7 +333,7 @@ void Map::connect_regions()
 
         merge_regions_at_cell(main_region, *chosen_connector);
 
-        dig(chosen_connector->m_pos, main_region.m_color);
+        dig(chosen_connector->pos, main_region.color);
 
         connectors.erase(
             std::find(connectors.begin(), connectors.end(), chosen_connector));
@@ -272,14 +372,29 @@ void Map::remove_dead_ends()
     }
 }
 
+void Map::remove_pillars()
+{
+    for (int x = 1; x < m_width - 1; ++x)
+    {
+        for (int y = 1; y < m_height - 1; ++y)
+        {
+            if (m_map[x][y].type == CellType::Wall &&
+                num_of_floor_neighbours(m_map[x][y]) == 8)
+            {
+                dig(Vec2{x, y}, m_map[x][y].color);
+            }
+        }
+    }
+}
+
 void Map::dig(Vec2 begin, Vec2 end, Color color)
 {
     for (int x = begin.x; x < end.x; ++x)
     {
         for (int y = begin.y; y < end.y; ++y)
         {
-            auto object = std::make_shared<Object>(Vec2{x * g_tile_size, y * g_tile_size},
-                                                   m_rock_floor_texture, m_renderer);
+            auto object =
+                std::make_shared<Object>(Vec2{x, y}, m_rock_floor_texture, m_renderer);
             m_map[x][y] = Cell{CellType::Floor, Vec2{x, y}, false, object, color};
         }
     }
@@ -287,18 +402,17 @@ void Map::dig(Vec2 begin, Vec2 end, Color color)
 
 void Map::dig(Vec2 pos, Color color)
 {
-    auto object = std::make_shared<Object>(Vec2{pos.x * g_tile_size, pos.y * g_tile_size},
-                                           m_rock_floor_texture, m_renderer);
+    auto object =
+        std::make_shared<Object>(Vec2{pos.x, pos.y}, m_rock_floor_texture, m_renderer);
     m_map[pos.x][pos.y] = Cell{CellType::Floor, Vec2{pos.x, pos.y}, false, object, color};
 }
 
 void Map::fill(Vec2 pos)
 {
     auto rock_wall_texture = TextureManager::get().get_texture("rock_wall");
-    auto rock_wall = std::make_shared<Object>(
-        Vec2{pos.x * g_tile_size, pos.y * g_tile_size}, rock_wall_texture, m_renderer);
-    m_map[pos.x][pos.y] =
-        Cell{CellType::Wall, pos, false, rock_wall, Color{255, 255, 255, 255}};
+    auto rock_wall =
+        std::make_shared<Object>(Vec2{pos.x, pos.y}, rock_wall_texture, m_renderer);
+    m_map[pos.x][pos.y] = Cell{CellType::Wall, pos, false, rock_wall, g_color_white};
 }
 
 bool Map::is_area_available(Vec2 begin, Vec2 end)
@@ -310,7 +424,7 @@ bool Map::is_area_available(Vec2 begin, Vec2 end)
     {
         for (int y = begin.y; y < end.y; ++y)
         {
-            if (m_map[x][y].m_type != CellType::Wall)
+            if (m_map[x][y].type != CellType::Wall)
             {
                 return false;
             }
@@ -320,27 +434,40 @@ bool Map::is_area_available(Vec2 begin, Vec2 end)
     return true;
 }
 
-constexpr int Map::num_of_solid_neighbours(const Cell& cell) const
+constexpr int Map::num_of_wall_neighbours(const Cell& cell) const
 {
     int num = 0;
-    for (int x = cell.m_pos.x - 1; x <= cell.m_pos.x + 1; ++x)
+    for (int x = cell.pos.x - 1; x <= cell.pos.x + 1; ++x)
     {
-        for (int y = cell.m_pos.y - 1; y <= cell.m_pos.y + 1; ++y)
+        for (int y = cell.pos.y - 1; y <= cell.pos.y + 1; ++y)
         {
-            num += m_map[x][y].m_type == CellType::Wall;
+            num += m_map[x][y].type == CellType::Wall;
         }
     }
     // Subtract the cell itself.
     return num - 1;
 }
 
+constexpr int Map::num_of_floor_neighbours(const Cell& cell) const
+{
+    int num = 0;
+    for (int x = cell.pos.x - 1; x <= cell.pos.x + 1; ++x)
+    {
+        for (int y = cell.pos.y - 1; y <= cell.pos.y + 1; ++y)
+        {
+            num += m_map[x][y].type == CellType::Floor;
+        }
+    }
+    return num;
+}
+
 bool Map::are_cells_around_free(const Cell& cell) const
 {
-    for (int x = cell.m_pos.x - 1; x <= cell.m_pos.x + 1; ++x)
+    for (int x = cell.pos.x - 1; x <= cell.pos.x + 1; ++x)
     {
-        for (int y = cell.m_pos.y - 1; y <= cell.m_pos.y + 1; ++y)
+        for (int y = cell.pos.y - 1; y <= cell.pos.y + 1; ++y)
         {
-            if (m_map[x][y].m_type == CellType::Floor &&
+            if (m_map[x][y].type == CellType::Floor &&
                 !is_cell_in_live_cells(m_map[x][y]))
             {
                 return false;
@@ -355,7 +482,7 @@ bool Map::is_cell_in_live_cells(const Cell& cell) const
 {
     for (auto& live_cell : m_live_cells)
     {
-        if (live_cell->m_pos == cell.m_pos)
+        if (live_cell->pos == cell.pos)
             return true;
     }
 
@@ -364,42 +491,42 @@ bool Map::is_cell_in_live_cells(const Cell& cell) const
 
 bool Map::is_adjacent_to_different_regions(const Cell& cell) const
 {
-    Vec2 pos = cell.m_pos;
+    Vec2 pos = cell.pos;
     int result = false;
     // Find a cell that is not a wall.
     Cell ref_cell;
-    if (m_map[pos.x][pos.y - 1].m_type != CellType::Wall)  // Upper
+    if (m_map[pos.x][pos.y - 1].type != CellType::Wall)  // Upper
         ref_cell = m_map[pos.x][pos.y - 1];
-    else if (m_map[pos.x + 1][pos.y].m_type != CellType::Wall)  // Right
+    else if (m_map[pos.x + 1][pos.y].type != CellType::Wall)  // Right
         ref_cell = m_map[pos.x + 1][pos.y];
-    else if (m_map[pos.x - 1][pos.y].m_type != CellType::Wall)  // Left
+    else if (m_map[pos.x - 1][pos.y].type != CellType::Wall)  // Left
         ref_cell = m_map[pos.x - 1][pos.y];
-    else if (m_map[pos.x][pos.y + 1].m_type != CellType::Wall)  // Bottom
+    else if (m_map[pos.x][pos.y + 1].type != CellType::Wall)  // Bottom
         ref_cell = m_map[pos.x][pos.y + 1];
 
     // Upper cell.
-    result += m_map[pos.x][pos.y - 1].m_color != ref_cell.m_color &&
-              m_map[pos.x][pos.y - 1].m_type != CellType::Wall;
+    result += m_map[pos.x][pos.y - 1].color != ref_cell.color &&
+              m_map[pos.x][pos.y - 1].type != CellType::Wall;
     // Right cell.
-    result += m_map[pos.x + 1][pos.y].m_color != ref_cell.m_color &&
-              m_map[pos.x + 1][pos.y].m_type != CellType::Wall;
+    result += m_map[pos.x + 1][pos.y].color != ref_cell.color &&
+              m_map[pos.x + 1][pos.y].type != CellType::Wall;
     // Bottom cell.
-    result += m_map[pos.x][pos.y + 1].m_color != ref_cell.m_color &&
-              m_map[pos.x][pos.y + 1].m_type != CellType::Wall;
+    result += m_map[pos.x][pos.y + 1].color != ref_cell.color &&
+              m_map[pos.x][pos.y + 1].type != CellType::Wall;
     // Left cell.
-    result += m_map[pos.x - 1][pos.y].m_color != ref_cell.m_color &&
-              m_map[pos.x - 1][pos.y].m_type != CellType::Wall;
+    result += m_map[pos.x - 1][pos.y].color != ref_cell.color &&
+              m_map[pos.x - 1][pos.y].type != CellType::Wall;
 
     return result > 0;
 }
 
 bool Map::is_adjacent_to_main_region(const Cell& cell, const Region& main_region)
 {
-    for (int x = cell.m_pos.x - 1; x <= cell.m_pos.x + 1; ++x)
+    for (int x = cell.pos.x - 1; x <= cell.pos.x + 1; ++x)
     {
-        for (int y = cell.m_pos.y - 1; y <= cell.m_pos.y + 1; ++y)
+        for (int y = cell.pos.y - 1; y <= cell.pos.y + 1; ++y)
         {
-            if (m_map[x][y].m_color == main_region.m_color)
+            if (m_map[x][y].color == main_region.color)
             {
                 return true;
             }
@@ -410,16 +537,16 @@ bool Map::is_adjacent_to_main_region(const Cell& cell, const Region& main_region
 }
 Region* Map::new_region_cell_connects_to(const Region& main_region, const Cell& cell)
 {
-    for (int x = cell.m_pos.x - 1; x <= cell.m_pos.x + 1; ++x)
+    for (int x = cell.pos.x - 1; x <= cell.pos.x + 1; ++x)
     {
-        for (int y = cell.m_pos.y - 1; y <= cell.m_pos.y + 1; ++y)
+        for (int y = cell.pos.y - 1; y <= cell.pos.y + 1; ++y)
         {
-            if (m_map[x][y].m_color != main_region.m_color &&
-                m_map[x][y].m_type != CellType::Wall)
+            if (m_map[x][y].color != main_region.color &&
+                m_map[x][y].type != CellType::Wall)
             {
                 for (auto& region : m_regions)
                 {
-                    if (region.m_color == m_map[x][y].m_color)
+                    if (region.color == m_map[x][y].color)
                     {
                         return &region;
                     }
@@ -434,15 +561,15 @@ Region* Map::new_region_cell_connects_to(const Region& main_region, const Cell& 
 bool Map::is_dead_end(const Cell& cell)
 {
     int result = 0;
-    Vec2 pos = cell.m_pos;
+    Vec2 pos = cell.pos;
     // Upper cell.
-    result += m_map[pos.x][pos.y - 1].m_type == CellType::Wall;
+    result += m_map[pos.x][pos.y - 1].type == CellType::Wall;
     // Right cell.
-    result += m_map[pos.x + 1][pos.y].m_type == CellType::Wall;
+    result += m_map[pos.x + 1][pos.y].type == CellType::Wall;
     // Bottom cell.
-    result += m_map[pos.x][pos.y + 1].m_type == CellType::Wall;
+    result += m_map[pos.x][pos.y + 1].type == CellType::Wall;
     // Left cell.
-    result += m_map[pos.x - 1][pos.y].m_type == CellType::Wall;
+    result += m_map[pos.x - 1][pos.y].type == CellType::Wall;
 
     return result >= 3;
 }
@@ -454,11 +581,11 @@ bool Map::merge_regions_at_cell(Region& main_region, Cell& cell)
     if (new_region == nullptr)
         return false;
 
-    new_region->m_color = main_region.m_color;
-    for (auto new_cell : new_region->m_cells)
+    new_region->color = main_region.color;
+    for (auto new_cell : new_region->cells)
     {
-        new_cell->m_color = main_region.m_color;
-        main_region.m_cells.push_back(new_cell);
+        new_cell->color = main_region.color;
+        main_region.cells.push_back(new_cell);
     }
 
     return true;
