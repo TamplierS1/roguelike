@@ -3,10 +3,11 @@
 
 #include <list>
 
+#include <raylib.h>
+
 #include "rng.h"
 #include "monster.h"
 #include "vec2.h"
-#include "color.h"
 
 namespace Rg::Map
 {
@@ -45,9 +46,9 @@ struct Room
 class Map
 {
 public:
-    explicit Map(const s_ptr<Renderer>& renderer);
+    explicit Map();
 
-    void update(const Camera& camera);
+    void update();
     void set_player(const s_ptr<Monster>& player);
 
     bool is_cell_available(Vec2 pos) const;
@@ -55,7 +56,7 @@ public:
     Vec2 m_player_start_position;
 
 private:
-    void render(const Camera& camera);
+    void render();
 
     void update_fog_of_war();
     void cast_ray(Vec2 begin, Vec2 end);
@@ -86,7 +87,7 @@ private:
     // The returned bool means success or failure.
     bool merge_regions_at_cell(Region& main_region, Cell& cell);
 
-    w_ptr<Monster> m_player;
+    s_ptr<Monster> m_player;
 
     // Width and height should always be odd.
     constexpr static int m_width = 71;
@@ -95,9 +96,8 @@ private:
     constexpr static int m_room_density = 100;
     constexpr static int m_room_size_min = 5;
     constexpr static int m_room_size_max = 13;
-
-    s_ptr<Renderer> m_renderer;
-    s_ptr<Texture> m_rock_floor_texture;
+    constexpr static Color m_explored_tile_color = DARKBROWN;
+    constexpr static Color m_visible_tile_color = RAYWHITE;
 
     using CellMap = std::array<std::array<Cell, m_height>, m_width>;
     CellMap m_map;

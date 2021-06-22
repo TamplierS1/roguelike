@@ -5,8 +5,9 @@
 #include <cassert>
 #include <string>
 
+#include <raylib.h>
+
 #include "common.h"
-#include "sdl_wrappers/texture.h"
 
 namespace Rg
 {
@@ -18,9 +19,9 @@ public:
     TextureManager(const TextureManager&) = delete;
     TextureManager(TextureManager&&) = delete;
 
-    void load_texture(const std::string& path, const std::string& name,
-                      Renderer* renderer);
-    [[nodiscard]] s_ptr<Texture> get_texture(const std::string& name)
+    void cleanup();
+    void load_texture(const std::string& path, const std::string& name);
+    [[nodiscard]] s_ptr<Texture2D> get_texture(const std::string& name)
     {
         assert(m_textures.find(name) != m_textures.end());
         return m_textures[name];

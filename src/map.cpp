@@ -2,13 +2,12 @@
 #include <cmath>
 
 #include "map.h"
+#include "log.h"
 #include "texture_manager.h"
 
 namespace Rg::Map
 {
-Map::Map(const s_ptr<Renderer>& renderer)
-    : m_renderer(renderer)
-    , m_rock_floor_texture(TextureManager::get().get_texture("rock_floor"))
+Map::Map()
 {
     fill_map_with_walls();
     dig_rooms();
@@ -22,10 +21,10 @@ Map::Map(const s_ptr<Renderer>& renderer)
         starting_room.begin + (starting_room.end - starting_room.begin) / 2;
 }
 
-void Map::update(const Camera& camera)
+void Map::update()
 {
     update_fog_of_war();
-    render(camera);
+    render();
 }
 
 void Map::set_player(const s_ptr<Monster>& player)
@@ -38,7 +37,7 @@ bool Map::is_cell_available(Vec2 pos) const
     return m_map[pos.x][pos.y].type == CellType::Floor;
 }
 
-void Map::render(const Camera& camera)
+void Map::render()
 {
     for (int x = 0; x < m_width; ++x)
     {
@@ -46,18 +45,18 @@ void Map::render(const Camera& camera)
         {
             auto object = m_map[x][y].object;
 
-            Color tile_color = g_color_black;
+            Color tile_color = BLACK;
             if (m_map[x][y].is_explored && !m_map[x][y].is_visible)
-                tile_color = g_color_dark_grey;
+                tile_color = m_explored_tile_color;
             else if (m_map[x][y].is_visible)
-                tile_color = g_color_white;
+                tile_color = m_visible_tile_color;
 
-            object->update(camera, tile_color);
+            object->update(tile_color);
 
             if (!m_map[x][y].is_dynamic)
                 continue;
 
-            auto action = object->get_action();
+            auto action = std::dynamic_pointer_cast<Monster>(object)->get_action();
             if (action != nullptr)
             {
                 try
@@ -75,10 +74,8 @@ void Map::render(const Camera& camera)
 
 void Map::update_fog_of_war()
 {
-    auto player = m_player.lock();
-
-    Vec2 pos = player->m_pos;
-    int radius = player->m_vision_radius;
+    Vec2 pos = m_player->m_pos;
+    int radius = m_player->m_vision_radius;
 
     // Make every cell in the visible radius invisible.
     for (int x = pos.x - radius - 1; x <= pos.x + radius + 1; ++x)
@@ -145,15 +142,13 @@ void Map::cast_ray(Vec2 begin, Vec2 end)
 void Map::fill_map_with_walls()
 {
     // Fill the map with walls.
-    auto rock_wall_texture = TextureManager::get().get_texture("rock_wall");
     for (int x = 0; x < m_width; ++x)
     {
         for (int y = 0; y < m_height; ++y)
         {
-            auto rock_wall =
-                std::make_shared<Object>(Vec2{x, y}, rock_wall_texture, m_renderer);
-            m_map[x][y] =
-                Cell{CellType::Wall, Vec2{x, y}, false, rock_wall, g_color_white};
+            auto rock_wall = std::make_shared<Object>(
+                Vec2{x, y}, TextureManager::get().get_texture("rock_wall"));
+            m_map[x][y] = Cell{CellType::Wall, Vec2{x, y}, false, rock_wall, WHITE};
         }
     }
 }
@@ -310,10 +305,10 @@ void Map::connect_regions()
         main_region = m_regions[m_rng.rand_int(0, m_regions.size() - 1)];
     }
     // Color the main region white.
-    main_region.color = g_color_white;
+    main_region.color = WHITE;
     for (auto cell : main_region.cells)
     {
-        cell->color = g_color_white;
+        cell->color = WHITE;
     }
 
     while (!connectors.empty())
@@ -393,8 +388,8 @@ void Map::dig(Vec2 begin, Vec2 end, Color color)
     {
         for (int y = begin.y; y < end.y; ++y)
         {
-            auto object =
-                std::make_shared<Object>(Vec2{x, y}, m_rock_floor_texture, m_renderer);
+            auto object = std::make_shared<Object>(
+                Vec2{x, y}, TextureManager::get().get_texture("rock_floor"));
             m_map[x][y] = Cell{CellType::Floor, Vec2{x, y}, false, object, color};
         }
     }
@@ -402,17 +397,16 @@ void Map::dig(Vec2 begin, Vec2 end, Color color)
 
 void Map::dig(Vec2 pos, Color color)
 {
-    auto object =
-        std::make_shared<Object>(Vec2{pos.x, pos.y}, m_rock_floor_texture, m_renderer);
-    m_map[pos.x][pos.y] = Cell{CellType::Floor, Vec2{pos.x, pos.y}, false, object, color};
+    auto rock_floor =
+        std::make_shared<Object>(pos, TextureManager::get().get_texture("rock_floor"));
+    m_map[pos.x][pos.y] = Cell{CellType::Floor, pos, false, rock_floor, color};
 }
 
 void Map::fill(Vec2 pos)
 {
-    auto rock_wall_texture = TextureManager::get().get_texture("rock_wall");
     auto rock_wall =
-        std::make_shared<Object>(Vec2{pos.x, pos.y}, rock_wall_texture, m_renderer);
-    m_map[pos.x][pos.y] = Cell{CellType::Wall, pos, false, rock_wall, g_color_white};
+        std::make_shared<Object>(pos, TextureManager::get().get_texture("rock_wall"));
+    m_map[pos.x][pos.y] = Cell{CellType::Wall, pos, false, rock_wall, WHITE};
 }
 
 bool Map::is_area_available(Vec2 begin, Vec2 end)

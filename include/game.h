@@ -4,10 +4,9 @@
 #include <memory>
 #include <vector>
 
+#include <raylib.h>
+
 #include "common.h"
-#include "sdl_wrappers/window.h"
-#include "sdl_wrappers/renderer.h"
-#include "sdl_wrappers/texture.h"
 #include "texture_manager.h"
 #include "actions/move.h"
 #include "map.h"
@@ -20,32 +19,26 @@ class Game
 public:
     ~Game()
     {
-        SDL_Quit();
-        IMG_Quit();
+        TextureManager::get().cleanup();
+        CloseWindow();
     }
 
-    int run();
-
-private:
     void init();
     void load_textures();
-    void process_events();
     void update();
-    void handle_input(SDL_Event event);
+    void handle_input();
 
     void move_player(Vec2 dir)
     {
         m_player->set_action(std::make_shared<Actions::Move>(dir, m_map));
     }
 
-    u_ptr<Window> m_window;
-    s_ptr<Renderer> m_renderer;
     s_ptr<Monster> m_player;
-
     s_ptr<Map::Map> m_map;
 
-    Camera m_camera = {0, 0};
-    bool m_is_running = true;
+    Camera2D m_camera;
+
+    std::array<bool, 350> m_keys;
 };
 
 }
