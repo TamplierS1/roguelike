@@ -3,42 +3,29 @@
 
 #include <unordered_map>
 
+#include <raylib.h>
+
 #include "vec2.h"
-#include "sdl_wrappers/texture.h"
 #include "actions/action.h"
 #include "common.h"
 
 namespace Rg
 {
-struct Camera;
-
 class Object
 {
 public:
-    Object(Vec2 pos, const s_ptr<Texture>& texture, const s_ptr<Renderer>& renderer,
-           int energy_regen = 50)
+    Object(Vec2 pos, const s_ptr<Texture2D>& texture, int energy_regen = 0)
         : m_pos(pos)
         , m_texture(texture)
-        , m_renderer(renderer)
         , m_energy_regen(energy_regen)
     {
     }
     virtual ~Object() = default;
 
-    virtual void update(const Camera& camera, Color color)
+    virtual void update(Color color)
     {
         m_energy += m_energy_regen;
-        render(camera, color);
-    }
-    [[nodiscard]] Actions::IAction* get_action()
-    {
-        auto action = m_current_action;
-        m_current_action.reset();
-        return action.get();
-    }
-    constexpr void set_action(const s_ptr<Actions::IAction>& action)
-    {
-        m_current_action = action;
+        render(color);
     }
 
     Vec2 m_pos;
@@ -48,12 +35,9 @@ public:
     int m_energy = 100;
 
 private:
-    void render(const Camera& camera, Color color);
+    void render(Color color);
 
-    w_ptr<Texture> m_texture;
-    w_ptr<Renderer> m_renderer;
-
-    s_ptr<Actions::IAction> m_current_action;
+    s_ptr<Texture2D> m_texture;
 
     int m_energy_regen;
 };

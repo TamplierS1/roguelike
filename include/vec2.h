@@ -7,6 +7,11 @@ struct Vec2
 {
     int x = 0;
     int y = 0;
+
+    constexpr Vector2 to_Vector2()
+    {
+        return Vector2{x, y};
+    }
 };
 
 constexpr static bool operator==(const Vec2& vec1, const Vec2& vec2)
@@ -62,6 +67,11 @@ constexpr static Vec2 operator/(const Vec2& vec1, const Vec2& vec2)
 constexpr static Vec2 operator/(const Vec2& vec1, const int number)
 {
     return Vec2{vec1.x / number, vec1.y / number};
+}
+
+constexpr static Vec2 operator*(const Vec2& vec1, const int number)
+{
+    return Vec2{vec1.x * number, vec1.y * number};
 }
 }
 

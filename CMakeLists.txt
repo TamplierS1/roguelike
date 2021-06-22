@@ -28,9 +28,8 @@ set(CXX_LINK_LIBS)
 list(APPEND CXX_INCLUDE_DIRS "include")
 
 find_package(fmt)
-find_library(SDL2_LIB "SDL2" "/usr/lib" "/usr/local/lib")
-find_library(SDL2_IMAGE_LIB "SDL2_image" "/usr/lib" "/usr/local/lib")
-list(APPEND CXX_LINK_LIBS ${SDL2_LIB} ${SDL2_IMAGE_LIB} fmt::fmt)
+find_package(raylib)
+list(APPEND CXX_LINK_LIBS raylib fmt::fmt)
 
 target_compile_options(roguelike PRIVATE ${CXX_COMPILE_FLAGS})
 target_link_options(roguelike PRIVATE ${CXX_LINK_FLAGS})

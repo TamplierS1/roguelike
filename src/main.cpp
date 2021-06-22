@@ -1,8 +1,8 @@
-#include "game.h"
+#include "gui.h"
 
 int main()
 {
-    Rg::Game game;
+    Rg::GUI game;
 
-    return game.run();
+    return game.draw();
 }

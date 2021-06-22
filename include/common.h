@@ -19,7 +19,12 @@ using w_ptr = std::weak_ptr<T>;
 static constexpr int g_screen_width = 1920;
 static constexpr int g_screen_height = 1080;
 
-static constexpr int g_tile_size = 32;
+static constexpr int g_tile_size = 16;
+
+constexpr static bool operator==(const Color& color1, const Color& color2)
+{
+    return color1.r == color2.r && color1.g == color2.g && color1.b == color2.b;
+}
 
 }
 

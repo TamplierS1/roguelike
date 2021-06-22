@@ -1,11 +1,10 @@
 #include "object.h"
-#include "sdl_wrappers/renderer.h"
 
 namespace Rg
 {
-void Object::render(const Camera& camera, Color color)
+void Object::render(Color color)
 {
-    m_renderer.lock()->render(this, m_texture.lock().get(), camera, color);
+    DrawTexture(*m_texture, m_pos.x * g_tile_size, m_pos.y * g_tile_size, color);
 }
 
 }
