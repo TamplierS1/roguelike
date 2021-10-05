@@ -1,0 +1,12 @@
+[submodule "third_party/fmt"]
+	path = third_party/fmt
+	url = https://github.com/fmtlib/fmt.git
+	ignore = dirty
+[submodule "third_party/raylib"]
+	path = third_party/raylib
+	url = https://github.com/raysan5/raylib.git
+	ignore = dirty
+[submodule "third_party/Nuklear"]
+	path = third_party/Nuklear
+	url = https://github.com/Immediate-Mode-UI/Nuklear.git
+	ignore = dirty

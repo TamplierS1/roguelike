@@ -1,0 +1,16 @@
+name: Ubuntu
+on: [ push ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: install deps
+        run: |
+          git submodule init
+          git submodule update
+          sudo apt install libasound2-dev mesa-common-dev libx11-dev libxrandr-dev libxi-dev xorg-dev libgl1-mesa-dev libglu1-mesa-dev
+      - name: build
+        run: |
+          chmod +x build.sh
+          ./build.sh
