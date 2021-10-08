@@ -25,7 +25,6 @@ public:
 enum class FailReason
 {
     SpaceIsOccupied,
-    NotEnoughEnergy
 };
 
 class ActionFailed : public std::exception

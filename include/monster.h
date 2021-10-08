@@ -8,9 +8,9 @@ namespace Rg
 class Monster : public Object
 {
 public:
-    Monster(Vec2 pos, const s_ptr<Texture>& texture, int hp, int energy_regen = 50,
+    Monster(Vec2 pos, const s_ptr <Texture> &texture, int hp,
             int vision_radius = 5)
-        : Object(pos, texture, energy_regen)
+        : Object(pos, texture)
         , m_hp(hp)
         , m_vision_radius(vision_radius)
     {

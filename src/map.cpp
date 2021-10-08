@@ -45,6 +45,7 @@ void Map::render()
         {
             auto object = m_map[x][y].object;
 
+            // TODO: perform tile culling.
             Color tile_color = BLACK;
             if (m_map[x][y].is_explored && !m_map[x][y].is_visible)
                 tile_color = m_explored_tile_color;
