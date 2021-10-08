@@ -31,4 +31,5 @@ mkdir build
 cd build || exit
 cmake ..
 make -j8
+cp "compile_commands.json" ..
 

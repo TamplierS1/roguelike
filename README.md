@@ -5,6 +5,8 @@ A simple hobby roguelike game.
 ## Build
 
 Run `build.sh` from the repo's root:  
+To start the game run `build/roguelike` from repo's root:
+
 
 ## Dependencies
 

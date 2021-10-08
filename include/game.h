@@ -20,7 +20,6 @@ public:
     ~Game()
     {
         TextureManager::get().cleanup();
-        CloseWindow();
     }
 
     void init();

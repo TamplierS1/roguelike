@@ -22,11 +22,6 @@ public:
     {
         assert(typeid(*object) == typeid(Monster));
 
-        if (object->m_energy < static_cast<int>(Costs::Move))
-        {
-            throw ActionFailed{FailReason::NotEnoughEnergy, "Not enough energy to move."};
-        }
-
         Vec2 new_pos{object->m_pos.x + m_dir.x, object->m_pos.y + m_dir.y};
 
         if (!m_map.lock()->is_cell_available(new_pos))
@@ -36,8 +31,6 @@ public:
         }
 
         object->m_pos = new_pos;
-
-        object->m_energy -= static_cast<int>(Costs::Move);
     }
 
 private:

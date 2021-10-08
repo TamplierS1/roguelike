@@ -5,9 +5,6 @@ namespace Rg
 {
 void Game::init()
 {
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_FULLSCREEN_MODE);
-    InitWindow(g_screen_width, g_screen_height, "Roguelike");
-    SetTargetFPS(60);
 
     load_textures();
 
@@ -15,7 +12,7 @@ void Game::init()
 
     auto player = std::make_shared<Monster>(
         m_map->m_player_start_position, TextureManager::get().get_texture("player"),
-        100, 50, 6);
+        100, 6);
     m_player = player;
 
     m_camera.target = (m_player->m_pos * g_tile_size + g_tile_size / 2).to_Vector2();
@@ -28,9 +25,9 @@ void Game::init()
 
 void Game::load_textures()
 {
-    TextureManager::get().load_texture("../res/player.png", "player");
-    TextureManager::get().load_texture("../res/rock_wall.png", "rock_wall");
-    TextureManager::get().load_texture("../res/rock_floor.png", "rock_floor");
+    TextureManager::get().load_texture("res/player.png", "player");
+    TextureManager::get().load_texture("res/rock_wall.png", "rock_wall");
+    TextureManager::get().load_texture("res/rock_floor.png", "rock_floor");
 }
 
 void Game::update()
@@ -55,6 +52,7 @@ void Game::update()
         }
         catch (const Actions::ActionFailed& e)
         {
+            // TODO: come up with some other error system.
             Log::warning(e.m_msg);
         }
     }

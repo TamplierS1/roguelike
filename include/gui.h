@@ -1,32 +1,40 @@
 #ifndef GUI_H
 #define GUI_H
 
+#define NK_INCLUDE_DEFAULT_ALLOCATOR
+#include "nuklear.h"
+#include "raylib.h"
+
 #include "game.h"
 
 namespace Rg
 {
+
+constexpr float calc_text_width(nk_handle handle, float height,
+                                const char* text, int len);
+constexpr Color to_ray_color(const nk_color& color);
+constexpr Vector2 to_ray_vec(const struct nk_vec2i& vec);
+
 class GUI
 {
 public:
+    GUI();
+    ~GUI();
+
     int draw();
 
 private:
     void handle_input();
-
-    void draw_gui();
-    void draw_sidebar();
+    void render_windows();
+    void render();
+    void load_fonts();
 
     Game m_game;
     std::array<bool, 350> m_keys;
 
-    Vec2 m_fps_pos = {20, 20};
-
-    Vec2 m_sidebar_size = {500, g_screen_height - 1};
-    Vec2 m_sidebar_pos = {g_screen_width - m_sidebar_size.x, 1};
-    Rectangle m_sidebar = {m_sidebar_pos.x, m_sidebar_pos.y, m_sidebar_size.x,
-                           m_sidebar_size.y};
-    int m_sidebar_thickness = 4;
-    Color m_sidebar_color = RAYWHITE;
+    struct nk_context m_nk_ctx;
+    nk_user_font m_nk_font;
+    u_ptr<Font> m_ray_font;
 };
 }
 
